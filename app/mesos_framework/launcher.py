@@ -3,7 +3,7 @@ from mesos.interface import mesos_pb2
 import registry
 
 # Create a global kvstore client
-ENDPOINT = 'http://10.112.0.101:8500/v1/kv'
+ENDPOINT = 'http://consul:8500/v1/kv'
 
 class MyMesosLauncher():
 

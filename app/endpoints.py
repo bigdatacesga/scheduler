@@ -1,11 +1,12 @@
 from flask import jsonify, request
 from . import api
 from mesos_framework.framework import MesosFramework
-import json
 
 framework = MesosFramework("bogus")
 
-@api.route('/new_instance', methods=['POST'])
+
+@api.route('/instance/', methods=['POST'])
+@api.route('/instance', methods=['POST'])
 def launch_new_instance():
     # Handle Content-Type: application/json requests
     if request.get_json():
@@ -21,6 +22,7 @@ def launch_new_instance():
                         'message': 'Unable to get the instance path'}), 400
 
 
+@api.route('/instances/', methods=['GET'])
 @api.route('/instances', methods=['GET'])
 def get_instances():
     return jsonify({"queued_tasks": framework.get_queued_instances()})

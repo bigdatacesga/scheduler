@@ -4,12 +4,7 @@ import threading
 import logging
 from .launcher import MyMesosLauncher
 import requests
-
 import registry
-
-
-# ENDPOINT = 'http://10.112.0.101:8500/v1/kv'
-# DISKS_ENDPOINT = 'http://127.0.0.1:5005/resources/disks/v1'
 
 # Create a global kvstore client
 ENDPOINT = 'http://consul:8500/v1/kv'

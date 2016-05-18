@@ -20,7 +20,7 @@ class MesosFramework:
         if not MesosFramework.instance:
             self.mesosDockerframework = self.get_mesos_docker_framework()
             self.mesosScheduler = self.get_mesos_scheduler()
-            self.mesosMasterAddress = '10.112.14.16:5050'
+            self.mesosMasterAddress = 'mesos.master.service.int.cesga.es:5050'
             self.start_mesos_driver()
             MesosFramework.instance = MesosFramework.__MesosFramework(arg)
         else:
@@ -59,8 +59,8 @@ class MesosFramework:
         # Launch the mesos mesos_framework
         framework = mesos_pb2.FrameworkInfo()
         framework.user = "root"  # Or leave empty to have Mesos fill in the current user.
-        framework.name = "MyMesosDockerExample"
-        framework.principal = "docker-mesos-example-mesos_framework"
+        framework.name = "BigDataServices"
+        framework.principal = "BigDataServices_MesosFramework"
         return framework
 
     def start_mesos_driver(self):
@@ -68,9 +68,6 @@ class MesosFramework:
         t = threading.Thread(target=driver.run)
         t.setDaemon(True)
         t.start()
-        #return (t, driver, mesosScheduler)
-        #while t.isAlive():
-        #    time.sleep(0.5)
 
     def add_task_to_queue(self, instance_path):
         self.mesosScheduler.queue_new_instance(instance_path)

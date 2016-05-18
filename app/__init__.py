@@ -18,6 +18,6 @@ def create_app(config_name):
     app.config.from_pyfile(cfg)
 
     # register blueprints
-    app.register_blueprint(api, url_prefix='/mesos_framework/v1')
+    app.register_blueprint(api, url_prefix='/bigdata/mesos_framework/v1')
 
     return app
