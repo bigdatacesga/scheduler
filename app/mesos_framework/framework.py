@@ -20,7 +20,7 @@ class MesosFramework:
         if not MesosFramework.instance:
             self.mesosDockerframework = self.get_mesos_docker_framework()
             self.mesosScheduler = self.get_mesos_scheduler()
-            self.mesosMasterAddress = 'mesos.master.service.int.cesga.es:5050'
+            self.mesosMasterAddress = 'mesosmaster.service.int.cesga.es:5050'
             self.start_mesos_driver()
             MesosFramework.instance = MesosFramework.__MesosFramework(arg)
         else:
