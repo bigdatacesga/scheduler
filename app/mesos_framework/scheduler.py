@@ -9,6 +9,7 @@ import registry
 # Create a global kvstore client
 ENDPOINT = 'http://consul:8500/v1/kv'
 DISKS_ENDPOINT = 'http://disks.service.int.cesga.es:5000/resources/disks/v1'
+#DISKS_ENDPOINT = 'http://127.0.0.1:5003/resources/disks/v1'
 
 class MyMesosScheduler(mesos.interface.Scheduler):
     # Receives a path to the service to be deployed, with the list of nodes
