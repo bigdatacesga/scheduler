@@ -5,11 +5,12 @@ import logging
 from .launcher import MyMesosLauncher
 import requests
 import registry
+from ..exceptions import ResourceException
 
 # Create a global kvstore client
 ENDPOINT = 'http://consul:8500/v1/kv'
 DISKS_ENDPOINT = 'http://disks.service.int.cesga.es:5000/resources/disks/v1'
-#DISKS_ENDPOINT = 'http://127.0.0.1:5003/resources/disks/v1'
+#DISKS_ENDPOINT = 'http://127.0.0.1:5002/resources/disks/v1'
 
 class MyMesosScheduler(mesos.interface.Scheduler):
     # Receives a path to the service to be deployed, with the list of nodes
@@ -29,45 +30,47 @@ class MyMesosScheduler(mesos.interface.Scheduler):
         service = registry.Cluster(instance_id)
         nodesList = service.nodes
         print(nodesList)
-        instances_list = list()
+        task_list = list()
         for node in nodesList:
-            instance = dict()
+            task = dict()
+
+            task["clustername"] = node.clustername
 
             # This is only used for logging
-            instance["node_id"] = node.node_id
+            task["name"] = node.clustername + '_' + node.name
 
             # Variable to be passed to the launcher
-            instance["node_dn"] = str(node)
+            task["node_dn"] = str(node)
 
             # Variables to be used when checking if the node can be launched with an offer
-            instance["cpu"] = int(node.cpu)
-            instance["mem"] = int(node.mem)
+            task["cpu"] = int(node.cpu)
+            task["mem"] = int(node.mem)
 
             if node.custom_disks == "True":
                 disk_list = node.disks
-                instance["custom_disks"] = True
+                task["custom_disks"] = True
                 disks = []
                 for disk in disk_list:
                     disks.append(disk.name)
-                instance["disks"] = disks
+                task["disks"] = disks
             else:
-                instance["num_disks"] = int(node.number_of_disks)
-                instance["custom_disks"] = False
+                task["num_disks"] = int(node.number_of_disks)
+                task["custom_disks"] = False
 
             if node.custom_node == "True":
-                instance["mesos_node_hostname"] = node.mesos_node_hostname
-                instance["custom_node"] = True
+                task["mesos_node_hostname"] = node.mesos_node_hostname
+                task["custom_node"] = True
             else:
-                instance["custom_node"] = False
+                task["custom_node"] = False
 
             # Persist that the node is now in the queue
             node.status = "queued"
 
             # Add node to the queue
-            instances_list.append(instance)
+            task_list.append(task)
 
-        print(instances_list)
-        self.tasks_queue += instances_list
+        print(task_list)
+        self.tasks_queue += task_list
 
     def match_mesos_node(self, hostname, task_data):
         custom_node_needed = task_data["custom_node"]
@@ -101,13 +104,13 @@ class MyMesosScheduler(mesos.interface.Scheduler):
         if r.status_code == 200:
             return r.json()[disk]
         else:
-            raise Exception("Can't get disks")
+            raise ResourceException("Can't get disks")
 
-    def set_disk_as_used(self, node, clustername, disk):
-        payload = {'status': 'used', 'clustername': clustername, 'node': node}
+    def set_disk_as_used(self, node, node_name, disk):
+        payload = {'status': 'used', 'clustername': node_name, 'node': node}
         r = requests.put(DISKS_ENDPOINT + "/{}/disks/{}".format(node, disk), data=payload)
         if r.status_code != 204:
-            raise Exception("Can't set disk as used")
+            raise ResourceException("Can't set disk as used")
 
 
     def set_mesos_used_disks(self, node, disks):
@@ -141,7 +144,7 @@ class MyMesosScheduler(mesos.interface.Scheduler):
                 disk_info = self.get_disk_info(node.mesos_node_hostname, disk_mesos_name)
 
                 # Set the disk path and origin so that the docker executor can create the dirs
-                disk.origin = disk_info['path'] + "/" + node.node_id
+                disk.origin = disk_info['path'] + "/" + node.clustername
                 disk.destination = disk_info['path']
 
                 # Set the mode
@@ -177,12 +180,12 @@ class MyMesosScheduler(mesos.interface.Scheduler):
         fail with a TASK_LOST status and a message saying as much).
         """
 
-        self.logger.info("I received %d offers" % len(offers))
-        self.logger.info("There are %d pending tasks" % len(self.tasks_queue))
+        # self.logger.info("I received %d offers" % len(offers))
+        # self.logger.info("There are %d pending tasks" % len(self.tasks_queue))
 
         def handle_offers(nodes_queue):
             declined = []
-            self.logger.info("Queued tasks are %s" % str(nodes_queue))
+            # self.logger.info("Queued tasks are %s" % str(nodes_queue))
             # Loop over the offers and see if there's anything that looks good
             for offer in offers:
                 offer_cpu = 0
@@ -204,20 +207,17 @@ class MyMesosScheduler(mesos.interface.Scheduler):
                     if resource.name == "dataDisks":
                         offer_disks = resource.set.item
 
-                self.logger.info("Offer has => cpu: %d mem: %d disks: %s", offer_cpu, offer_mem, str(offer_disks))
+                #self.logger.info("Offer has => cpu: %d mem: %d disks: %s", offer_cpu, offer_mem, str(offer_disks))
 
                 # Iterate over tasks in queue to see how many can be launched with the given resources
                 tasks_to_launch = []
                 for task in nodes_queue:
-                    # self.logger.info("Attempting to launch task %s with => cpu: %d mem: %d", task["name"], task["cpu"] , task["mem"])
+                    #self.logger.info("Attempting to launch task %s with => cpu: %d mem: %d", task["name"], task["cpu"] , task["mem"])
                     if(offer_cpu >= task["cpu"] and
                        offer_mem >= task["mem"] and
                        offer_disks is not None and
                        self.match_disks(offer_disks, task) and
                        self.match_mesos_node(offer.hostname, task)):
-
-                        # Remove the task from the queue
-                        nodes_queue.remove(task)
 
                         # Mark the offer as used so it is not declined
                         offer_was_used = True
@@ -234,25 +234,34 @@ class MyMesosScheduler(mesos.interface.Scheduler):
                         # Persist offer id
                         node.mesos_offer_id = offer.id
 
-                        self.logger.info("MATCH !! -> Will launch task " + task["node_id"] )
+                        self.logger.info("MATCH !! -> Will launch task " + task["name"])
 
                         # Remove the resources used from the offer
                         offer_cpu -= task["cpu"]  # Decrease cpus used
                         offer_mem -= task["mem"]  # Decrease memory used
-                        used_disks = self.select_disks(task, offer_disks)  # Get the disks from the pool
+                        try:
+                            used_disks = self.select_disks(task, offer_disks)  # Get the disks from the pool
+                        except(ResourceException):
+                            # FIXME What to do when an error with disks resources arises, remove task or leave tasks in queue
+                            # So that not the entire instance is affected, we leave the tasks in the queue and hope the error is fixed
+                            self.logger.error("------------ RESOURCE ERROR ------------")
+                            self.logger.error("Task %s encountered resource error with Offer %s in node %s", task["name"], offer.id, offer.hostname)
+                            self.logger.error("Please check that a node with the same name exists in the resource tree of the kvstore")
+                            self.logger.error("------------ RESOURCE ERROR ------------")
+                            driver.declineOffer(offer.id)
+                            break;
+
                         task["disks"] = used_disks
                         offer_disks = self.remove_used_disks(offer_disks, used_disks)  # Remove used disks
 
-                        self.logger.info("Task %s used disks %s", task["node_id"], str(used_disks))
+                        # Remove the task from the queue once it has been prepared to be launched
+                        nodes_queue.remove(task)
 
                         tasks_to_launch.append(task)
 
                 # If we have any tasks to launch, ask the driver to launch them.
                 if tasks_to_launch:
                     self.launcher.launch_nodes(tasks_to_launch, driver, offer.id)
-                    #for task in tasks_to_launch:
-                        #nodes_queue.remove(task)
-                        #self.launcher.launch_node(task["node_dn"], driver, offer.id)
 
                 if not offer_was_used:
                     self.logger.info("Offer was useless")
@@ -260,14 +269,14 @@ class MyMesosScheduler(mesos.interface.Scheduler):
 
             # Decline the offers in batch
             if declined != []:
-                self.logger.info("I declined %d offers" % len(declined))
+                #self.logger.info("I declined %d offers" % len(declined))
                 for declinedOffer in declined:
                     driver.declineOffer(declinedOffer)
 
         t = threading.Thread(target=handle_offers, args=([self.tasks_queue]))
         t.start()
 
-    #### TASK MANAGEMENT CODER ####
+    #### TASK MANAGEMENT CODE ####
     # Not modified from examples
     # https://github.com/tarnfeld/mesos-python-framework/blob/master/framework.py
 
