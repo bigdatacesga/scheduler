@@ -16,6 +16,10 @@ class MyMesosScheduler(mesos.interface.Scheduler):
     # Receives a path to the service to be deployed, with the list of nodes
     # Inspects the offers and when possible calls launcher to deploy a node
     # Writes in the key/value store the disks used and the hostnames
+
+
+    lock = threading.Lock()
+
     def __init__(self, implicitAcknowledgements):
         self.implicitAcknowledgements = implicitAcknowledgements
         self.logger = logging.getLogger('mesos')
@@ -211,6 +215,9 @@ class MyMesosScheduler(mesos.interface.Scheduler):
 
                 # Iterate over tasks in queue to see how many can be launched with the given resources
                 tasks_to_launch = []
+
+                self.lock.acquire()
+
                 for task in nodes_queue:
                     #self.logger.info("Attempting to launch task %s with => cpu: %d mem: %d", task["name"], task["cpu"] , task["mem"])
                     if(offer_cpu >= task["cpu"] and
@@ -246,7 +253,7 @@ class MyMesosScheduler(mesos.interface.Scheduler):
                             # So that not the entire instance is affected, we leave the tasks in the queue and hope the error is fixed
                             self.logger.error("------------ RESOURCE ERROR ------------")
                             self.logger.error("Task %s encountered resource error with Offer %s in node %s", task["name"], offer.id, offer.hostname)
-                            self.logger.error("Please check that a node with the same name exists in the resource tree of the kvstore")
+                            self.logger.error("Please check that a node with \"%s\" name exists in the resource tree of the kvstore", offer.hostname)
                             self.logger.error("------------ RESOURCE ERROR ------------")
                             driver.declineOffer(offer.id)
                             break;
@@ -258,6 +265,8 @@ class MyMesosScheduler(mesos.interface.Scheduler):
                         nodes_queue.remove(task)
 
                         tasks_to_launch.append(task)
+
+                self.lock.release()
 
                 # If we have any tasks to launch, ask the driver to launch them.
                 if tasks_to_launch:
