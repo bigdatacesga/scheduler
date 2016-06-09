@@ -8,4 +8,12 @@ This project implements a full mesos framework that is able to receive offers fr
 
 A REST API is provided.
 
-Test with:
+Test instance execution with:
+
+curl -X POST http://mesos_framework.service.int.cesga.es:5000/bigdata/mesos_framework/v1/instance -d '{"instance_dn": "/instances/jenes/mpi/1.0/1"}' -H "Content-type: application/json"
+
+
+Get the queued instances with:
+
+curl http://mesos_framework.service.int.cesga.es:5000/bigdata/mesos_framework/v1/instances
+

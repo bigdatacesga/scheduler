@@ -9,6 +9,7 @@ from . import scheduler
 class MesosFramework:
 
     class __MesosFramework:
+        #FIXME remove useless arg and test
         def __init__(self, arg):
             self.val = arg
 
@@ -16,6 +17,7 @@ class MesosFramework:
             return repr(self) + self.val
     instance = None
 
+    # FIXME remove useless arg and test
     def __init__(self, arg):
         if not MesosFramework.instance:
             self.mesosDockerframework = self.get_mesos_docker_framework()

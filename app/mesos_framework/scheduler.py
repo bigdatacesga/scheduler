@@ -17,7 +17,8 @@ class MyMesosScheduler(mesos.interface.Scheduler):
     # Inspects the offers and when possible calls launcher to deploy a node
     # Writes in the key/value store the disks used and the hostnames
 
-
+    # FIXME Added lock to handle many offers and the tasks queue
+    # See if it can be optimized for better performance
     lock = threading.Lock()
 
     def __init__(self, implicitAcknowledgements):
@@ -115,7 +116,6 @@ class MyMesosScheduler(mesos.interface.Scheduler):
         r = requests.put(DISKS_ENDPOINT + "/{}/disks/{}".format(node, disk), data=payload)
         if r.status_code != 204:
             raise ResourceException("Can't set disk as used")
-
 
     def set_mesos_used_disks(self, node, disks):
         # node.disks = mesos_disks
@@ -216,6 +216,8 @@ class MyMesosScheduler(mesos.interface.Scheduler):
                 # Iterate over tasks in queue to see how many can be launched with the given resources
                 tasks_to_launch = []
 
+                #FIXME lock management
+                #Lock the queue
                 self.lock.acquire()
 
                 for task in nodes_queue:
@@ -256,6 +258,7 @@ class MyMesosScheduler(mesos.interface.Scheduler):
                             self.logger.error("Please check that a node with \"%s\" name exists in the resource tree of the kvstore", offer.hostname)
                             self.logger.error("------------ RESOURCE ERROR ------------")
                             driver.declineOffer(offer.id)
+                            #FIXME Offer can't be declined if it was previously used, check that this case is no possible or fix
                             break;
 
                         task["disks"] = used_disks
@@ -266,6 +269,8 @@ class MyMesosScheduler(mesos.interface.Scheduler):
 
                         tasks_to_launch.append(task)
 
+                # FIXME lock management
+                # Unlock the queue
                 self.lock.release()
 
                 # If we have any tasks to launch, ask the driver to launch them.
