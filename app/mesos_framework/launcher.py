@@ -25,7 +25,7 @@ class MyMesosLauncher():
             task_data["cpu"] = int(node.cpu)
             task_data["mem"] = int(node.mem)
             task_data["name"] = node.name
-            task_data["clustername"] = node.clustername
+            task_data["clusterid"] = node.clusterid
             task_data["disks"] = disks
             task_data["mem"] = int(node.mem)
             task_data["instance_dn"] = str(node)
@@ -45,7 +45,7 @@ class MyMesosLauncher():
         '''
         task = mesos_pb2.TaskInfo()
 
-        task.task_id.value = str(task_data["clustername"] + '_' + task_data["name"])
+        task.task_id.value = str(task_data["clusterid"] + '_' + task_data["name"])
         task.slave_id.value = slave_id
         task.name = task_data["name"]
 

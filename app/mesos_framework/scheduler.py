@@ -39,10 +39,10 @@ class MyMesosScheduler(mesos.interface.Scheduler):
         for node in nodesList:
             task = dict()
 
-            task["clustername"] = node.clustername
+            task["clusterid"] = node.clusterid
 
             # This is only used for logging
-            task["name"] = node.clustername + '_' + node.name
+            task["name"] = node.clusterid + '_' + node.name
 
             # Variable to be passed to the launcher
             task["node_dn"] = str(node)
@@ -117,10 +117,6 @@ class MyMesosScheduler(mesos.interface.Scheduler):
         if r.status_code != 204:
             raise ResourceException("Can't set disk as used")
 
-    def set_mesos_used_disks(self, node, disks):
-        # node.disks = mesos_disks
-        node.set_disks(disks)  # Temporary FIX
-
     def select_disks(self, task_data, offer_disks):
         custom_disks_needed = task_data["custom_disks"]
         used_disks = []
@@ -148,14 +144,14 @@ class MyMesosScheduler(mesos.interface.Scheduler):
                 disk_info = self.get_disk_info(node.mesos_node_hostname, disk_mesos_name)
 
                 # Set the disk path and origin so that the docker executor can create the dirs
-                disk.origin = disk_info['path'] + "/" + node.clustername
+                disk.origin = disk_info['path'] + "/" + node.clusterid
                 disk.destination = disk_info['path']
 
                 # Set the mode
                 disk.mode = disk_info['mode']
 
                 # Set the disk as used
-                self.set_disk_as_used(node.mesos_node_hostname, node.clustername, disk_mesos_name)
+                self.set_disk_as_used(node.mesos_node_hostname, node.clusterid, disk_mesos_name)
 
                 # Increment counter of the disk to get from the mesos offer
                 i += 1
