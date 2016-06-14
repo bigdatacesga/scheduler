@@ -1,5 +1,5 @@
 from mesos.interface import mesos_pb2
-
+import json
 import registry
 
 # Create a global kvstore client
@@ -48,6 +48,7 @@ class MyMesosLauncher():
         task.task_id.value = str(task_data["clusterid"] + '_' + task_data["name"])
         task.slave_id.value = slave_id
         task.name = task_data["name"]
+        task.data = json.dumps({"instance_dn": task_data["clusterid"]})
 
         # Define the command line to execute in the Docker container
         # command = mesos_pb2.CommandInfo()
@@ -56,13 +57,13 @@ class MyMesosLauncher():
         # command.value = "echo \"TESTING\" && sleep 60"
         # command.value = ""
 
-        task.command.value = "docker-executor run " + task_data["instance_dn"]
+        # task.command.value = "docker-executor run " + task_data["instance_dn"]
 
-        #executor = mesos_pb2.ExecutorInfo()
-        #executor.executor_id.value = "cesga_docker_executor_{}".format(str(task_data["node_id"]))
-        #executor.name = "My docker executor"
-        #executor.command.value = "docker-executor run " + task_data["instance_dn"]
-        #task.executor.MergeFrom(executor)
+        executor = mesos_pb2.ExecutorInfo()
+        executor.executor_id.value = str(task_data["instance_dn"].replace("/", "_").replace(".", "-"))
+        executor.name = "My test executor"
+        executor.command.value = "/root/executor.py"
+        task.executor.MergeFrom(executor)
 
         # CPUs are repeated elements too
         cpus = task.resources.add()

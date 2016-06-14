@@ -3,33 +3,27 @@ import mesos.interface
 import mesos.native
 import threading
 from mesos.interface import mesos_pb2
+from mesos.interface.mesos_pb2 import TaskID
 from . import scheduler
-
+import registry
 
 class MesosFramework:
 
     class __MesosFramework:
-        #FIXME remove useless arg and test
-        def __init__(self, arg):
-            self.val = arg
+        def __init__(self):
+            pass
 
         def __str__(self):
-            return repr(self) + self.val
+            return repr(self)
     instance = None
 
-    # FIXME remove useless arg and test
-    def __init__(self, arg):
+    def __init__(self):
         if not MesosFramework.instance:
             self.mesosDockerframework = self.get_mesos_docker_framework()
             self.mesosScheduler = self.get_mesos_scheduler()
             self.mesosMasterAddress = 'mesosmaster.service.int.cesga.es:5050'
-            self.start_mesos_driver()
-            MesosFramework.instance = MesosFramework.__MesosFramework(arg)
-        else:
-            MesosFramework.instance.val = arg
-
-    def __getattr__(self, name):
-        return getattr(self.instance, name)
+            self.driver = self.start_mesos_driver()
+            MesosFramework.instance = MesosFramework.__MesosFramework()
 
     def get_mesos_scheduler(self):
 
@@ -70,9 +64,19 @@ class MesosFramework:
         t = threading.Thread(target=driver.run)
         t.setDaemon(True)
         t.start()
+        return driver
 
     def add_task_to_queue(self, instance_path):
         self.mesosScheduler.queue_new_instance(instance_path)
+
+    def kill_instance(self, instance_id):
+        service = registry.Cluster(instance_id)
+        nodesList = service.nodes
+        for node in nodesList:
+            clusterid = node.clusterid + "_" + node.name
+            message = TaskID()
+            message.value = clusterid
+            self.driver.killTask(message)
 
     def get_queued_instances(self):
         return self.mesosScheduler.get_queued_instances()

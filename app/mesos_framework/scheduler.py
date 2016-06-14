@@ -31,6 +31,7 @@ class MyMesosScheduler(mesos.interface.Scheduler):
     def get_queued_instances(self):
         return self.tasks_queue
 
+
     def queue_new_instance(self, instance_id):
         service = registry.Cluster(instance_id)
         nodesList = service.nodes
