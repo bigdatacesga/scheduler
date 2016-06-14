@@ -20,6 +20,7 @@ import sys
 import time
 import uuid
 from threading import Thread
+import json
 
 from mesos.interface import Scheduler, mesos_pb2
 from mesos.native import MesosSchedulerDriver
@@ -35,14 +36,9 @@ DISKS_ENDPOINT = 'http://disks.service.int.cesga.es:5000/resources/disks/v1'
 
 
 class BigDataScheduler(Scheduler):
-    def __init__(self, implicitAcknowledgements):
-    #def __init__(self, executor):
-        #self.executor = executor
+    def __init__(self, executor):
+        self.executor = executor
         self.jobs = utils.JobQueue()
-        self.implicitAcknowledgements = implicitAcknowledgements
-        ### TMP
-        self.tasks = []
-        ### TMP
         registry.connect(ENDPOINT)
 
     def registered(self, driver, framework_id, master_info):
@@ -70,11 +66,9 @@ class BigDataScheduler(Scheduler):
         """
         logging.info('Disconnected')
 
-
-    ### TMP ##
-    def queue_new_instance(self, instance_path):
-        self.tasks.append(instance_path)
-    ### TMP ##
+    def queue_new_instance(self, clusterid):
+        cluster = registry.Cluster(clusterid)
+        self.jobs.append(cluster.nodes)
 
     def resourceOffers(self, driver, offers):
         """
@@ -93,78 +87,45 @@ class BigDataScheduler(Scheduler):
         """
         for offer in offers:
             logging.info("Received offer with ID: {}".format(offer.id.value))
-            if self.tasks == []:
+            available = utils.resources_from(offer)
+            # Mesos tasks to launch generated from the job queue
+            tasks = []
+            for job in self.jobs.pending():
+                if utils.offer_has_enough_resources(available, job):
+                    # TODO: Refactor disks allocation to a method
+                    try:
+                        allocated_disks = utils.select_disks(job, available['disks'])
+                    except(ResourceException):
+                        logging.error("Task %s encountered resource error with Offer %s "
+                                      "in node %s", job.name, offer.id, offer.hostname)
+                        logging.error("Please check that a node with \"%s\" name exists "
+                                      "in the resource tree of the kvstore", offer.hostname)
+                        driver.declineOffer(offer.id)
+                        #FIXME Offer can't be declined if it was previously used
+                        break
+                    job.disks = allocated_disks
+                    job.slave_id = offer.slave_id.value
+                    job.hostname = offer.hostname
+                    job.offer_id = offer.id
+
+                    available['cpu'] -= job.cpu
+                    available['mem'] -= job.mem
+                    available['disks'] = utils.remove_used_disks(available['disks'],
+                                                                 allocated_disks)
+                    node = registry.Node(job.node_dn)
+                    node.mesos_slave_id = offer.slave_id.value
+                    node.mesos_node_hostname = offer.hostname
+                    node.mesos_offer_id = offer.id
+
+                    utils.update_cluster_progress(node)
+
+                    logging.info("Scheduling new task for launch: {}".format(job.name))
+                    tasks.append(self.task_from(job))
+                    self.jobs.remove(job)
+            if tasks:
+                driver.launchTasks(offer.id, tasks)
+            else:
                 driver.declineOffer(offer.id)
-                continue
-
-            task = mesos_pb2.TaskInfo()
-            #task_id = str(uuid.uuid4())
-            task_id = str(self.tasks.pop().replace("/", "_").replace(".", "-"))
-            task.task_id.value = task_id
-            task.slave_id.value = offer.slave_id.value
-            task.name = "task {}".format(task_id)
-
-            # task.executor.MergeFrom(self.executor)
-            executor = mesos_pb2.ExecutorInfo()
-            executor.executor_id.value = str(task_id)
-            executor.name = "My test executor"
-            executor.command.value = "/root/executor.py"
-            task.executor.MergeFrom(executor)
-
-            task.data = "Hello from task {}!".format(task_id)
-
-            cpus = task.resources.add()
-            cpus.name = 'cpus'
-            cpus.type = mesos_pb2.Value.SCALAR
-            cpus.scalar.value = 0.1
-
-            mem = task.resources.add()
-            mem.name = 'mem'
-            mem.type = mesos_pb2.Value.SCALAR
-            mem.scalar.value = 32
-
-            tasks = [task]
-            driver.launchTasks(offer.id, tasks)
-
-            ############################# OUR CODE
-            # offer_was_used = False
-            #
-            # available = utils.get_available_resources(offer)
-            #
-            # tasks_to_launch = []
-            # for job in self.jobs:
-            #     if utils.resources_match(available, job):
-            #         offer_was_used = True
-            #         node = registry.Node(task["node_dn"])
-            #         node.mesos_slave_id = offer.slave_id.value
-            #         node.mesos_node_hostname = offer.hostname
-            #         node.mesos_offer_id = offer.id
-            #         available['cpu'] -= task["cpu"]
-            #         available['mem'] -= task["mem"]
-            #         try:
-            #             used_disks = utils.select_disks(job, available['disks'])
-            #         except(ResourceException):
-            #             logging.error("Task %s encountered resource error with Offer %s "
-            #                           "in node %s", task["name"], offer.id, offer.hostname)
-            #             logging.error("Please check that a node with \"%s\" name exists "
-            #                           "in the resource tree of the kvstore", offer.hostname)
-            #             driver.declineOffer(offer.id)
-            #             #FIXME Offer can't be declined if it was previously used
-            #             break
-            #
-            #         job.disks = used_disks
-            #         available['disks'] = utils.remove_used_disks(available['disks'], used_disks)
-            #
-            #         logging.info("Scheduling new task for launch: {}".format(job.name))
-            #         tasks_to_launch.append(job)
-            #         self.jobs.remove(job)
-            #
-            # if tasks_to_launch:
-            #     self.launcher.launch_nodes(tasks_to_launch, driver, offer.id)
-
-            # if not offer_was_used:
-            #     self.logger.info("Offer was useless")
-            #     driver.declineOffer(offer.id)
 
     def offerRescinded(self, driver, offer_id):
         """
@@ -224,6 +185,39 @@ class BigDataScheduler(Scheduler):
           callback.
         """
         logging.error(message)
+
+    def task_from(self, job):
+        """Create a mesos task from a given job"""
+        task = mesos_pb2.TaskInfo()
+        #task_id = str(uuid.uuid4())
+        #task_id = str(self.tasks.pop().replace("/", "_").replace(".", "-"))
+        task_id = str(job.clusterid + '_' + job.name)
+        task.task_id.value = task_id
+        task.slave_id.value = job.slave_id
+        task.name = job.name
+        task.data = json.dumps({"instance_dn": job.clusterid})
+        task.executor.MergeFrom(self.executor)
+
+        cpus = task.resources.add()
+        cpus.name = "cpus"
+        cpus.type = mesos_pb2.Value.SCALAR
+        cpus.scalar.value = job.cpu
+
+        mem = task.resources.add()
+        mem.name = "mem"
+        mem.type = mesos_pb2.Value.SCALAR
+        mem.scalar.value = job.mem
+
+        disks = task.resources.add()
+        disks.name = "dataDisks"
+        disks.type = mesos_pb2.Value.SET
+
+        required_tasks_disks = job.disks
+        used_disks = required_tasks_disks
+        for disk in used_disks:
+            disks.set.item.append(disk)
+
+        return task
 
 
 def main(master):

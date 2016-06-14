@@ -23,9 +23,11 @@ def update_cluster_progress(node):
     else:
         cluster.status = 'executing'
 
+
 Job = namedtuple('Job', ('clusterid', 'name', 'node_dn',
                          'cpu', 'mem', 'disks', 'num_disks', 'has_custom_disks',
-                         'mesos_node_hostname', 'has_custom_node'))
+                         'mesos_node_hostname', 'has_custom_node',
+                         'slave_id', 'offer_id'))
 
 
 class JobQueue(object):
@@ -140,7 +142,7 @@ def remove_used_disks(offer_disks, used_disks):
     return offer_disks
 
 
-def resources_match(available, job):
+def offer_has_enough_resources(available, job):
     """Verify if available resources satisfies the requirements of a given job"""
     if (available['cpu'] >= job.cpu and available['mem'] >= job.mem
             and available['disks'] is not None 
@@ -150,7 +152,7 @@ def resources_match(available, job):
     return False
 
 
-def get_available_resources(offer):
+def resources_from(offer):
     """Returns the available resources in the offer"""
     available = {}
     for resource in offer.resources:
@@ -158,7 +160,7 @@ def get_available_resources(offer):
             available['cpu'] = resource.scalar.value
         if resource.name == "mem":
             available['mem'] = resource.scalar.value
-        offer_disks = None
+        available['disks'] = None
         if resource.name == "dataDisks":
             available['disks'] = resource.set.item
     available['hostname'] = offer.hostname

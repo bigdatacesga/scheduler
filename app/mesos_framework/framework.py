@@ -7,6 +7,7 @@ from mesos.interface.mesos_pb2 import TaskID
 from . import scheduler
 import registry
 
+
 class MesosFramework:
 
     class __MesosFramework:
@@ -39,8 +40,11 @@ class MesosFramework:
         # add the handlers to the logger
         logger.addHandler(res)
 
-        implicitAcknowledgements = 1
-        mesosScheduler = scheduler.BigDataScheduler(implicitAcknowledgements)
+        executor = mesos_pb2.ExecutorInfo()
+        executor.executor_id.value = 'BigDataExecutor'
+        executor.name = "Custom Big Data executor"
+        executor.command.value = "/root/executor.py"
+        mesosScheduler = scheduler.BigDataScheduler(executor)
 
         return mesosScheduler
 
