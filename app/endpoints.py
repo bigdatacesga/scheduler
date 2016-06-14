@@ -2,16 +2,21 @@ from flask import jsonify, request
 from . import api, framework
 
 
-@api.route('/instance/', methods=['POST'])
+@api.route('/instance', methods=['DELETE'])
 @api.route('/instance', methods=['POST'])
-def launch_new_instance():
+def handle_instance():
     # Handle Content-Type: application/json requests
     if request.get_json():
         data = request.get_json()
         instance_path = data['instance_dn']
-        framework.add_task_to_queue(instance_path)
-        return jsonify({'status': '200',
-                        'message': 'Service instance queued'}), 200
+        if request.method == "POST":
+            framework.add_task_to_queue(instance_path)
+            return jsonify({'status': '200',
+                            'message': 'Service instance queued'}), 200
+        elif request.method == "DELETE":
+            framework.kill_instance(instance_path)
+            return jsonify({'status': '200',
+                            'message': 'Service instance destroyed'}), 200
     # Handle form param requests: eg. curl -d status=free
     else:
         return jsonify({'status': '400',

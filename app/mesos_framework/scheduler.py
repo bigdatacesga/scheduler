@@ -35,9 +35,14 @@ DISKS_ENDPOINT = 'http://disks.service.int.cesga.es:5000/resources/disks/v1'
 
 
 class BigDataScheduler(Scheduler):
-    def __init__(self, executor):
-        self.executor = executor
+    def __init__(self, implicitAcknowledgements):
+    #def __init__(self, executor):
+        #self.executor = executor
         self.jobs = utils.JobQueue()
+        self.implicitAcknowledgements = implicitAcknowledgements
+        ### TMP
+        self.tasks = []
+        ### TMP
         registry.connect(ENDPOINT)
 
     def registered(self, driver, framework_id, master_info):
@@ -49,7 +54,7 @@ class BigDataScheduler(Scheduler):
         """
         logging.info("Registered with framework ID: {}".format(framework_id.value))
 
-    def reregistered():
+    def reregistered(self):
         """
           Invoked when the scheduler re-registers with a newly elected Mesos
           master.  This is only called when the scheduler has previously been
@@ -58,12 +63,18 @@ class BigDataScheduler(Scheduler):
         """
         logging.info('Reregistered')
 
-    def disconnected():
+    def disconnected(self):
         """
           Invoked when the scheduler becomes disconnected from the master, e.g.
           the master fails and another is taking over.
         """
         logging.info('Disconnected')
+
+
+    ### TMP ##
+    def queue_new_instance(self, instance_path):
+        self.tasks.append(instance_path)
+    ### TMP ##
 
     def resourceOffers(self, driver, offers):
         """
@@ -82,13 +93,24 @@ class BigDataScheduler(Scheduler):
         """
         for offer in offers:
             logging.info("Received offer with ID: {}".format(offer.id.value))
+            if self.tasks == []:
+                driver.declineOffer(offer.id)
+                continue
 
             task = mesos_pb2.TaskInfo()
-            task_id = str(uuid.uuid4())
+            #task_id = str(uuid.uuid4())
+            task_id = str(self.tasks.pop().replace("/", "_").replace(".", "-"))
             task.task_id.value = task_id
             task.slave_id.value = offer.slave_id.value
             task.name = "task {}".format(task_id)
-            task.executor.MergeFrom(self.executor)
+
+            # task.executor.MergeFrom(self.executor)
+            executor = mesos_pb2.ExecutorInfo()
+            executor.executor_id.value = str(task_id)
+            executor.name = "My test executor"
+            executor.command.value = "/root/executor.py"
+            task.executor.MergeFrom(executor)
+
             task.data = "Hello from task {}!".format(task_id)
 
             cpus = task.resources.add()
@@ -105,44 +127,44 @@ class BigDataScheduler(Scheduler):
             driver.launchTasks(offer.id, tasks)
 
             ############################# OUR CODE
-            offer_was_used = False
+            # offer_was_used = False
+            #
+            # available = utils.get_available_resources(offer)
+            #
+            # tasks_to_launch = []
+            # for job in self.jobs:
+            #     if utils.resources_match(available, job):
+            #         offer_was_used = True
+            #         node = registry.Node(task["node_dn"])
+            #         node.mesos_slave_id = offer.slave_id.value
+            #         node.mesos_node_hostname = offer.hostname
+            #         node.mesos_offer_id = offer.id
+            #         available['cpu'] -= task["cpu"]
+            #         available['mem'] -= task["mem"]
+            #         try:
+            #             used_disks = utils.select_disks(job, available['disks'])
+            #         except(ResourceException):
+            #             logging.error("Task %s encountered resource error with Offer %s "
+            #                           "in node %s", task["name"], offer.id, offer.hostname)
+            #             logging.error("Please check that a node with \"%s\" name exists "
+            #                           "in the resource tree of the kvstore", offer.hostname)
+            #             driver.declineOffer(offer.id)
+            #             #FIXME Offer can't be declined if it was previously used
+            #             break
+            #
+            #         job.disks = used_disks
+            #         available['disks'] = utils.remove_used_disks(available['disks'], used_disks)
+            #
+            #         logging.info("Scheduling new task for launch: {}".format(job.name))
+            #         tasks_to_launch.append(job)
+            #         self.jobs.remove(job)
+            #
+            # if tasks_to_launch:
+            #     self.launcher.launch_nodes(tasks_to_launch, driver, offer.id)
 
-            available = utils.get_available_resources(offer)
-
-            tasks_to_launch = []
-            for job in self.jobs:
-                if utils.resources_match(available, job):
-                    offer_was_used = True
-                    node = registry.Node(task["node_dn"])
-                    node.mesos_slave_id = offer.slave_id.value
-                    node.mesos_node_hostname = offer.hostname
-                    node.mesos_offer_id = offer.id
-                    available['cpu'] -= task["cpu"]
-                    available['mem'] -= task["mem"]
-                    try:
-                        used_disks = utils.select_disks(job, available['disks'])
-                    except(ResourceException):
-                        logging.error("Task %s encountered resource error with Offer %s "
-                                      "in node %s", task["name"], offer.id, offer.hostname)
-                        logging.error("Please check that a node with \"%s\" name exists "
-                                      "in the resource tree of the kvstore", offer.hostname)
-                        driver.declineOffer(offer.id)
-                        #FIXME Offer can't be declined if it was previously used
-                        break
-
-                    job.disks = used_disks
-                    available['disks'] = utils.remove_used_disks(available['disks'], used_disks)
-
-                    logging.info("Scheduling new task for launch: {}".format(job.name))
-                    tasks_to_launch.append(job)
-                    self.jobs.remove(job)
-
-            if tasks_to_launch:
-                self.launcher.launch_nodes(tasks_to_launch, driver, offer.id)
-
-            if not offer_was_used:
-                self.logger.info("Offer was useless")
-                driver.declineOffer(offer.id)
+            # if not offer_was_used:
+            #     self.logger.info("Offer was useless")
+            #     driver.declineOffer(offer.id)
 
     def offerRescinded(self, driver, offer_id):
         """

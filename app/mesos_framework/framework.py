@@ -40,7 +40,7 @@ class MesosFramework:
         logger.addHandler(res)
 
         implicitAcknowledgements = 1
-        mesosScheduler = scheduler.MyMesosScheduler(implicitAcknowledgements)
+        mesosScheduler = scheduler.BigDataScheduler(implicitAcknowledgements)
 
         return mesosScheduler
 
@@ -70,13 +70,17 @@ class MesosFramework:
         self.mesosScheduler.queue_new_instance(instance_path)
 
     def kill_instance(self, instance_id):
-        service = registry.Cluster(instance_id)
-        nodesList = service.nodes
-        for node in nodesList:
-            clusterid = node.clusterid + "_" + node.name
-            message = TaskID()
-            message.value = clusterid
-            self.driver.killTask(message)
+        message = TaskID()
+        message.value = instance_id.replace("/", "_").replace(".", "-")
+        self.driver.killTask(message)
+
+        # service = registry.Cluster(instance_id)
+        # nodesList = service.nodes
+        # for node in nodesList:
+        #     clusterid = node.clusterid + "_" + node.name
+        #     message = TaskID()
+        #     message.value = clusterid
+        #     self.driver.killTask(message)
 
     def get_queued_instances(self):
         return self.mesosScheduler.get_queued_instances()
