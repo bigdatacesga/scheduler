@@ -1,8 +1,5 @@
 from flask import jsonify, request
-from . import api
-from mesos_framework.framework import MesosFramework
-
-framework = MesosFramework("bogus")
+from . import api, framework
 
 
 @api.route('/instance/', methods=['POST'])
@@ -26,6 +23,3 @@ def launch_new_instance():
 @api.route('/instances', methods=['GET'])
 def get_instances():
     return jsonify({"queued_tasks": framework.get_queued_instances()})
-
-
-

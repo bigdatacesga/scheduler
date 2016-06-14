@@ -1,6 +1,10 @@
 import os
 from flask import Flask
 from flask import Blueprint
+from mesos_framework.framework import MesosFramework
+
+# Initialize a mesos framework instance
+framework = MesosFramework("")
 
 # Create a blueprint
 api = Blueprint('api', __name__)

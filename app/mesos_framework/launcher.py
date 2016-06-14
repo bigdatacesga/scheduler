@@ -1,9 +1,10 @@
 from mesos.interface import mesos_pb2
-
 import registry
+from . import utils
 
 # Create a global kvstore client
 ENDPOINT = 'http://consul:8500/v1/kv'
+
 
 class MyMesosLauncher():
 
@@ -28,7 +29,9 @@ class MyMesosLauncher():
             task_data["clusterid"] = node.clusterid
             task_data["disks"] = disks
             task_data["mem"] = int(node.mem)
-            task_data["instance_dn"] = str(node)
+            task_data["nodedn"] = str(node)
+
+            utils.update_cluster_progress(node)
 
             task_template = self.new_instance(node.mesos_slave_id, task_data)
             task_templates.append(task_template)
@@ -56,12 +59,12 @@ class MyMesosLauncher():
         # command.value = "echo \"TESTING\" && sleep 60"
         # command.value = ""
 
-        task.command.value = "docker-executor run " + task_data["instance_dn"]
+        task.command.value = "docker-executor run " + task_data["nodedn"]
 
         #executor = mesos_pb2.ExecutorInfo()
         #executor.executor_id.value = "cesga_docker_executor_{}".format(str(task_data["node_id"]))
         #executor.name = "My docker executor"
-        #executor.command.value = "docker-executor run " + task_data["instance_dn"]
+        #executor.command.value = "docker-executor run " + task_data["nodedn"]
         #task.executor.MergeFrom(executor)
 
         # CPUs are repeated elements too

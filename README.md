@@ -17,3 +17,11 @@ Get the queued instances with:
 
 curl http://mesos_framework.service.int.cesga.es:5000/bigdata/mesos_framework/v1/instances
 
+Installing dependencies
+-----------------------
+
+    pip install -r requirements.txt
+    cd lib/<OS-version>
+    pip install mesos.interface-0.28.1-py2-none-any.whl \
+                mesos.native-0.28.1-cp27-none-linux_x86_64.whl \
+                mesos-0.28.1-py2-none-any.whl
