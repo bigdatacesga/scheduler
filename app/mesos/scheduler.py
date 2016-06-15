@@ -38,7 +38,7 @@ DISKS_ENDPOINT = 'http://disks.service.int.cesga.es:5000/resources/disks/v1'
 class BigDataScheduler(Scheduler):
     def __init__(self, executor):
         self.executor = executor
-        self.jobs = utils.JobQueue()
+        self.queue = utils.JobQueue()
         registry.connect(ENDPOINT)
 
     def registered(self, driver, framework_id, master_info):
@@ -66,10 +66,6 @@ class BigDataScheduler(Scheduler):
         """
         logging.info('Disconnected')
 
-    def queue_new_instance(self, clusterid):
-        cluster = registry.Cluster(clusterid)
-        self.jobs.append(cluster.nodes)
-
     def resourceOffers(self, driver, offers):
         """
           Invoked when resources have been offered to this framework. A single
@@ -87,14 +83,18 @@ class BigDataScheduler(Scheduler):
         """
         for offer in offers:
             logging.info("Received offer with ID: {}".format(offer.id.value))
-            available = utils.resources_from(offer)
+            available = utils.resources_from_offer(offer)
+            logging.info("Received offer: node={}, cpus={}, mem={}, disks={}"
+                         .format(offer.hostname, available.cpus, available.mem,
+                                 available.disks))
             # Mesos tasks to launch generated from the job queue
             tasks = []
-            for job in self.jobs.pending():
-                if utils.offer_has_enough_resources(available, job):
+            for job in self.queue.pending():
+                required = utils.resources_from_job(job)
+                if utils.offer_has_enough_resources(available, required):
                     # TODO: Refactor disks allocation to a method
                     try:
-                        allocated_disks = utils.select_disks(job, available['disks'])
+                        allocated_disks = utils.select_disks(available.disks, required.disks)
                     except(ResourceException):
                         logging.error("Task %s encountered resource error with Offer %s "
                                       "in node %s", job.name, offer.id, offer.hostname)
@@ -108,10 +108,11 @@ class BigDataScheduler(Scheduler):
                     job.hostname = offer.hostname
                     job.offer_id = offer.id
 
-                    available['cpu'] -= job.cpu
-                    available['mem'] -= job.mem
-                    available['disks'] = utils.remove_used_disks(available['disks'],
-                                                                 allocated_disks)
+                    # Reduce the remaining available resourses from this offer
+                    available.cpus -= job.cpus
+                    available.mem -= job.mem
+                    available.disks = utils.remove_disks(available.disks, allocated_disks)
+
                     node = registry.Node(job.node_dn)
                     node.mesos_slave_id = offer.slave_id.value
                     node.mesos_node_hostname = offer.hostname
@@ -121,7 +122,7 @@ class BigDataScheduler(Scheduler):
 
                     logging.info("Scheduling new task for launch: {}".format(job.name))
                     tasks.append(self.task_from(job))
-                    self.jobs.remove(job)
+                    self.queue.remove(job)
             if tasks:
                 driver.launchTasks(offer.id, tasks)
             else:
@@ -201,7 +202,7 @@ class BigDataScheduler(Scheduler):
         cpus = task.resources.add()
         cpus.name = "cpus"
         cpus.type = mesos_pb2.Value.SCALAR
-        cpus.scalar.value = job.cpu
+        cpus.scalar.value = job.cpus
 
         mem = task.resources.add()
         mem.name = "mem"
@@ -218,6 +219,14 @@ class BigDataScheduler(Scheduler):
             disks.set.item.append(disk)
 
         return task
+
+    def enqueue(self, cluster):
+        """Enqueue all nodes of a given cluster"""
+        self.queue.append(cluster.nodes)
+
+    def pending(self):
+        """Returns the list of pending jobs"""
+        return self.queue.pending()
 
 
 def main(master):

@@ -1,30 +1,39 @@
 from flask import jsonify, request
-from . import api, framework
+from . import api
+from mesos import framework
+import registry
 
 
-@api.route('/instance', methods=['DELETE'])
-@api.route('/instance', methods=['POST'])
-def handle_instance():
-    # Handle Content-Type: application/json requests
-    if request.get_json():
+@api.route('/clusters', methods=['POST'])
+def submit_cluster():
+    """Submit a new cluster instance to Mesos"""
+    # Only application/json requests are valid
+    if is_valid(request):
         data = request.get_json()
-        instance_path = data['instance_dn']
-        if request.method == "POST":
-            framework.add_task_to_queue(instance_path)
-            return jsonify({'status': '200',
-                            'message': 'Service instance queued'}), 200
-        elif request.method == "DELETE":
-            framework.kill_instance(instance_path)
-            return jsonify({'status': '200',
-                            'message': 'Service instance destroyed'}), 200
-    # Handle form param requests: eg. curl -d status=free
+        clusterdn = data['clusterdn']
+        cluster = registry.Cluster(clusterdn)
+        framework.submit(cluster)
+        return jsonify({'message': 'Service instance queued'}), 200
     else:
         return jsonify({'status': '400',
                         'error': 'Invalid request',
-                        'message': 'Unable to get the instance path'}), 400
+                        'message': 'Unable to get the clusterdn'}), 400
 
 
-@api.route('/instances/', methods=['GET'])
-@api.route('/instances', methods=['GET'])
-def get_instances():
-    return jsonify({"queued_tasks": framework.get_queued_instances()})
+@api.route('/clusters/<clusterdn>', methods=['DELETE'])
+def kill_cluster(clusterdn):
+    """Kill a cluster instance"""
+    cluster = registry.Cluster(clusterdn)
+    framework.kill(cluster)
+    return '', 204
+
+
+@api.route('/clusters', methods=['GET'])
+def list_clusters():
+    """Get a list of cluster instances"""
+    return jsonify({"queued_tasks": framework.pending()})
+
+
+def is_valid(request):
+    """Validate a cluster submission request"""
+    return request.get_json() and 'clusterdn' in request.get_json()

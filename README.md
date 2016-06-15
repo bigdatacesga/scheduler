@@ -25,3 +25,9 @@ Installing dependencies
     pip install mesos.interface-0.28.1-py2-none-any.whl \
                 mesos.native-0.28.1-cp27-none-linux_x86_64.whl \
                 mesos-0.28.1-py2-none-any.whl
+
+Mesos executor
+--------------
+The mesos executor must be distrubuted to the mesos slaves at placed at:
+
+    /usr/local/mesos/bin/paas-executor.py

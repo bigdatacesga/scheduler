@@ -1,10 +1,12 @@
 import os
 from flask import Flask
 from flask import Blueprint
-from mesos_framework.framework import MesosFramework
+from . import mesos
 
-# Initialize a mesos framework instance
-framework = MesosFramework()
+app = Flask(__name__)
+config_name = os.environ.get('FLASK_CONFIG', 'development')
+cfg = os.path.join(os.getcwd(), 'config', config_name + '.py')
+app.config.from_pyfile(cfg)
 
 # Create a blueprint
 api = Blueprint('api', __name__)
@@ -12,16 +14,9 @@ api = Blueprint('api', __name__)
 from . import endpoints
 from . import errors
 
+# register blueprints
+app.register_blueprint(api, url_prefix='/bigdata/mesos_framework/v1')
 
-def create_app(config_name):
-    """Create an application instance."""
-    app = Flask(__name__)
-
-    # apply configuration
-    cfg = os.path.join(os.getcwd(), 'config', config_name + '.py')
-    app.config.from_pyfile(cfg)
-
-    # register blueprints
-    app.register_blueprint(api, url_prefix='/bigdata/mesos_framework/v1')
-
-    return app
+# Initialize a mesos framework instance
+master = app.config.get('MESOS_MASTER')
+mesos.framework.start(master)
