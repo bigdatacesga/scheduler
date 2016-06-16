@@ -19,4 +19,5 @@ app.register_blueprint(api, url_prefix='/bigdata/mesos_framework/v1')
 
 # Initialize a mesos framework instance
 master = app.config.get('MESOS_MASTER')
+
 mesos.framework.start(master)

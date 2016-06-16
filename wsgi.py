@@ -18,4 +18,4 @@ app.logger.handlers.extend(logging.getLogger("gunicorn.error").handlers)
 app.logger.handlers.extend(logging.getLogger("gunicorn").handlers)
 
 if __name__ == '__main__':
-    application.run()
+    application.run(threaded=False)

@@ -82,11 +82,11 @@ class BigDataScheduler(Scheduler):
           tasks will fail with a TASK_LOST status and a message saying as much).
         """
         for offer in offers:
-            logging.debug("Received offer with ID: {}".format(offer.id.value))
+            logging.debug('Received offer with ID: {}'.format(offer.id.value))
             available = utils.resources_from_offer(offer)
-            logging.info("Received offer: node={}, cpus={}, mem={}, disks={}"
-                         .format(offer.hostname, available.cpus, available.mem,
-                                 available.disks))
+            logging.debug('Resources offered: node={}, cpus={}, mem={}, disks={}'
+                          .format(offer.hostname, available.cpus, available.mem,
+                                  available.disks))
             # Mesos tasks to launch generated from the job queue
             tasks = []
             for job in self.queue.pending():
@@ -231,79 +231,3 @@ class BigDataScheduler(Scheduler):
     def pending(self):
         """Returns the list of pending jobs"""
         return self.queue.pending()
-
-
-def main(master):
-    logging.basicConfig(level=logging.INFO,
-                        format='[%(asctime)s %(levelname)s] %(message)s')
-
-    # Create a new executor
-    executor = mesos_pb2.ExecutorInfo()
-    executor.executor_id.value = 'ExampleExecutor'
-    executor.name = executor.executor_id.value
-    executor.command.value = os.path.abspath('./executor-skeleton.py')
-
-    # Create a new framework
-    framework = mesos_pb2.FrameworkInfo()
-    framework.user = ''  # the current user
-    framework.name = 'ExampleFramework'
-    framework.checkpoint = True
-
-    implicitAcknowledgements = 1
-
-    if os.getenv('EXAMPLE_AUTHENTICATE'):
-        logging.info('Enabling framework authentication')
-
-        credential = mesos_pb2.Credential()
-        credential.principal = os.getenv('EXAMPLE_PRINCIPAL')
-        credential.secret = os.getenv('EXAMPLE_SECRET')
-        framework.principal = os.getenv('EXAMPLE_PRINCIPAL')
-
-        driver = MesosSchedulerDriver(
-            BigDataScheduler(executor),
-            framework,
-            master,
-            implicitAcknowledgements,
-            credential
-        )
-    else:
-        framework.principal = framework.name
-
-        driver = MesosSchedulerDriver(
-            BigDataScheduler(executor),
-            framework,
-            master,
-            implicitAcknowledgements
-        )
-
-    def signal_handler(signal, frame):
-        logging.info('Shutting down')
-        driver.stop()
-
-    # driver.run() blocks, so we run it in a separate thread.
-    # This way, we can catch a SIGINT to kill the framework.
-    def run_driver_thread():
-        status = 0 if driver.run() == mesos_pb2.DRIVER_STOPPED else 1
-        driver.stop()  # Ensure the driver process terminates
-        sys.exit(status)
-
-    driver_thread = Thread(target=run_driver_thread, args=())
-    driver_thread.start()
-
-    logging.info('Scheduler running, Ctrl-C to exit')
-    signal.signal(signal.SIGINT, signal_handler)
-
-    # Block the main thread while the driver thread is alive
-    while driver_thread.is_alive():
-        time.sleep(1)
-
-    logging.info('Framework finished.')
-    sys.exit(0)
-
-
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print("Usage: {} <mesos_master>".format(sys.argv[0]))
-        sys.exit(1)
-    else:
-        main(sys.argv[1])
