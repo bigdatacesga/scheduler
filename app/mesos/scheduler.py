@@ -82,7 +82,7 @@ class BigDataScheduler(Scheduler):
           tasks will fail with a TASK_LOST status and a message saying as much).
         """
         for offer in offers:
-            logging.info("Received offer with ID: {}".format(offer.id.value))
+            logging.debug("Received offer with ID: {}".format(offer.id.value))
             available = utils.resources_from_offer(offer)
             logging.info("Received offer: node={}, cpus={}, mem={}, disks={}"
                          .format(offer.hostname, available.cpus, available.mem,
@@ -92,9 +92,11 @@ class BigDataScheduler(Scheduler):
             for job in self.queue.pending():
                 required = utils.resources_from_job(job)
                 if utils.offer_has_enough_resources(available, required):
+                    allocated_disks = utils.select_disks(available.disks, required.disks)
                     # TODO: Refactor disks allocation to a method
                     try:
-                        allocated_disks = utils.select_disks(available.disks, required.disks)
+                        utils.update_disks_service_allocate(
+                            offer.hostname, allocated_disks, str(job.node))
                     except(ResourceException):
                         logging.error("Task %s encountered resource error with Offer %s "
                                       "in node %s", job.name, offer.id, offer.hostname)
@@ -108,15 +110,17 @@ class BigDataScheduler(Scheduler):
                     job.hostname = offer.hostname
                     job.offer_id = offer.id
 
+                    # Update node object information
+                    node = job.node
+                    node.mesos_slave_id = offer.slave_id.value
+                    node.mesos_node_hostname = offer.hostname
+                    node.mesos_offer_id = offer.id
+                    utils.update_disks_origin(node.disks, allocated_disks, str(node))
+
                     # Reduce the remaining available resourses from this offer
                     available.cpus -= job.cpus
                     available.mem -= job.mem
                     available.disks = utils.remove_disks(available.disks, allocated_disks)
-
-                    node = registry.Node(job.node_dn)
-                    node.mesos_slave_id = offer.slave_id.value
-                    node.mesos_node_hostname = offer.hostname
-                    node.mesos_offer_id = offer.id
 
                     utils.update_cluster_progress(node)
 

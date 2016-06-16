@@ -8,6 +8,10 @@ import uuid
 
 ENDPOINT = 'http://10.112.0.101:8500/v1/kv'
 
+class MockDisk(object):
+    def __init__(self):
+        self.origin = None
+
 
 class StatusTestCase(unittest.TestCase):
 
@@ -115,6 +119,24 @@ class StatusTestCase(unittest.TestCase):
         self.assertEqual(selected, expected)
 
     def test_get_disk_info(self):
+        disk = utils.get_disk_info('c13-1', 'disk1')
+        self.assertTrue('path' in disk)
+
+    def test_update_disks_origin(self):
+        disks = []
+        disk1 = MockDisk()
+        disks.append(disk1)
+        disk2 = MockDisk()
+        disks.append(disk2)
+        allocations = ['disk1', 'disk4']
+        nodedn = str(self.node)
+        utils.update_disks_origin(disks, allocations, nodedn)
+        expected = '/data/disk1/{}'.format(registry.id_from(nodedn))
+        self.assertEqual(disks[0].origin, expected)
+        expected = '/data/disk4/{}'.format(registry.id_from(nodedn))
+        self.assertEqual(disks[1].origin, expected)
+
+    def test_update_disks_service_allocate(self):
         raise NotImplementedError
 
     def test_set_disk_as_used(self):

@@ -1,10 +1,11 @@
 from __future__ import print_function
 
 import logging
-from collections import namedtuple
 
 import requests
 import registry
+from registry import id_from
+
 
 ENDPOINT = 'http://consul:8500/v1/kv'
 DISKS_ENDPOINT = 'http://disks.service.int.cesga.es:5000/resources/disks/v1'
@@ -36,12 +37,6 @@ class Resources(object):
         self.mem = mem
         self.disks = disks
         self.host = host
-
-
-#Job = namedtuple('Job', ('clusterid', 'name', 'node_dn',
-                         #'cpus', 'mem', 'disks', 'num_disks', 'has_custom_disks',
-                         #'mesos_node_hostname', 'has_custom_node',
-                         #'slave_id', 'offer_id'))
 
 
 class Job(object):
@@ -103,7 +98,7 @@ def match_host(offered, required):
 
 def has_enough_disks(offered, required):
     """Verify if the disks offered satisfy the requirements
-    
+
        required: can be a number or a specific list of disks
     """
     # Check if specific disks are requested
@@ -116,49 +111,44 @@ def has_enough_disks(offered, required):
     return True
 
 
-def get_disk_info(node, disk):
+def get_disk_info(host, disk):
     """Get disk info from the disks service"""
-    r = requests.get(DISKS_ENDPOINT + "/{}/disks/{}".format(node, disk))
+    r = requests.get(DISKS_ENDPOINT + "/{}/disks/{}".format(host, disk))
     if r.status_code == 200:
         return r.json()[disk]
     else:
         raise DiskServiceError('Unable to get information from the disks service')
 
 
-def set_disk_as_used(node, node_name, disk):
+def select_disks(offered, required):
+    """Select the disks to be used"""
+    # If a specific list of disks is requested this are the selected disks
+    if isinstance(required, list) or isinstance(required, tuple):
+        return required
+    # In other case just a given number of disks is requested
+    selected = offered[:required]
+
+    return selected
+
+
+def update_disks_service_allocate(host, disks, nodedn):
+    """Set disks as used in the disks service"""
+    for disk in disks:
+        set_disk_as_used(host, nodedn, disk)
+
+
+def set_disk_as_used(host, nodedn, disk):
     """Set the disk as used in the disks service"""
-    payload = {'status': 'used', 'clustername': node_name, 'node': node}
-    r = requests.put(DISKS_ENDPOINT + "/{}/disks/{}".format(node, disk), data=payload)
+    payload = {'status': 'used', 'clustername': nodedn, 'node': host}
+    r = requests.put(DISKS_ENDPOINT + "/{}/disks/{}".format(host, disk), data=payload)
     if r.status_code != 204:
         raise DiskServiceError('Error setting disk as used in the disks service')
 
 
-def select_disks(offered, required):
-    """Select the disks to be used"""
-    # If a specific list of disks is requested
-    if isinstance(required, list) or isinstance(required, tuple):
-        return required
-
-    # If just a number of disks is requested
-    selected = offered[:required]
-
-    # TODO: Set disk as used in the disks service
-    #mesos_disks = node.disks
-    #used_disks = []
-    #for i, disk in enumerate(mesos_disks):
-        #used_disks.append(offer_disks[i])
-        #disk_mesos_name = str(offer_disks[i])
-        #disk.mesos_name = disk_mesos_name
-
-        #disk_info = get_disk_info(node.mesos_node_hostname, disk_mesos_name)
-
-        #disk.origin = disk_info['path'] + "/" + node.clusterid
-        #disk.destination = disk_info['path']
-        #disk.mode = disk_info['mode']
-
-        #set_disk_as_used(node.mesos_node_hostname, node.clusterid, disk_mesos_name)
-
-    return selected
+def update_disks_origin(disks, allocations, nodedn):
+    """Update the disk.origin of each Disk object"""
+    for disk, name in zip(disks, allocations):
+        disk.origin = '/data/{}/{}'.format(name, id_from(nodedn))
 
 
 def remove_disks(offered, used):
