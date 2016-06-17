@@ -1,7 +1,7 @@
 import os
 from flask import Flask
 from flask import Blueprint
-from . import mesos
+#from . import mesos
 
 app = Flask(__name__)
 config_name = os.environ.get('FLASK_CONFIG', 'development')
@@ -18,6 +18,5 @@ from . import errors
 app.register_blueprint(api, url_prefix='/bigdata/mesos_framework/v1')
 
 # Initialize a mesos framework instance
-master = app.config.get('MESOS_MASTER')
-
-mesos.framework.start(master)
+#master = app.config.get('MESOS_MASTER')
+#mesos.framework.start(master)

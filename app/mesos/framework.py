@@ -1,9 +1,6 @@
 """Big Data Mesos Framework"""
 import logging
 import os
-import signal
-import sys
-import time
 from threading import Thread
 
 from mesos.interface import mesos_pb2
@@ -40,15 +37,13 @@ def pending():
 
 def start(master):
     """Start the Big Data framework"""
-    global STARTED
+    global driver, scheduler
 
-    if STARTED:
-        return True
+    if driver and scheduler:
+        return driver, scheduler
 
     logging.basicConfig(level=logging.INFO,
                         format='[%(asctime)s %(levelname)s] %(message)s')
-
-    logging.error('==> Starting Scheduler: STARTED={}'.format(STARTED))
 
     executor = mesos_pb2.ExecutorInfo()
     executor.executor_id.value = 'BigDataExecutor'
@@ -81,26 +76,23 @@ def start(master):
     # driver.run() blocks, so we run it in a separate thread.
     # This way, we can catch a SIGINT to kill the framework.
     def run_driver_thread():
-        status = 0 if driver.run() == mesos_pb2.driver_STOPPED else 1
-        driver.stop()  # Ensure the driver process terminates
-        sys.exit(status)
+        status = 0 if driver.run() == mesos_pb2.DRIVER_STOPPED else 1
+        return status
 
     driver_thread = Thread(target=run_driver_thread, args=())
+    # Stop abruptly the thread if the main process exits
+    #driver_thread.setDaemon(True)
     driver_thread.start()
-
-    STARTED = True
 
     logging.info('Scheduler running')
 
-    def signal_handler(signal, frame):
-        logging.info('Shutting down scheduler')
-        driver.stop()
+    return driver, scheduler
 
-    #signal.signal(signal.SIGINT, signal_handler)
 
-    # Block the main thread while the driver thread is alive
-    #while driver_thread.is_alive():
-        #time.sleep(1)
-
-    #logging.info('Framework finished.')
-    #sys.exit(0)
+def stop():
+    """Stop the framework"""
+    global driver, scheduler
+    logging.info('Shutting down scheduler')
+    driver.stop()
+    driver = None
+    scheduler = None
