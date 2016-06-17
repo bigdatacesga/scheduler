@@ -2,11 +2,11 @@
 import unittest
 import registry
 import utils
-from utils import Job
 from mesos.interface import mesos_pb2
 import uuid
 
 ENDPOINT = 'http://10.112.0.101:8500/v1/kv'
+
 
 class MockDisk(object):
     def __init__(self):
@@ -131,9 +131,9 @@ class StatusTestCase(unittest.TestCase):
         allocations = ['disk1', 'disk4']
         nodedn = str(self.node)
         utils.update_disks_origin(disks, allocations, nodedn)
-        expected = '/data/disk1/{}'.format(registry.id_from(nodedn))
+        expected = '/data/1/{}'.format(registry.id_from(nodedn))
         self.assertEqual(disks[0].origin, expected)
-        expected = '/data/disk4/{}'.format(registry.id_from(nodedn))
+        expected = '/data/4/{}'.format(registry.id_from(nodedn))
         self.assertEqual(disks[1].origin, expected)
 
     def test_update_disks_service_allocate(self):
@@ -141,6 +141,13 @@ class StatusTestCase(unittest.TestCase):
 
     def test_set_disk_as_used(self):
         raise NotImplementedError
+
+    def test_initialize_cluster_status(self):
+        cluster = self.cluster
+        cluster.status = 'pending'
+        utils.initialize_cluster_status(cluster)
+        self.assertEqual(cluster.status, 'queued')
+        self.assertEqual(cluster.progress, '0')
 
     def generate_offer(self, cpus=1, mem=1024, disks=('disk1')):
         offer = mesos_pb2.Offer()

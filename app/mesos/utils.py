@@ -151,7 +151,8 @@ def set_disk_as_used(host, nodedn, disk):
 def update_disks_origin(disks, allocations, nodedn):
     """Update the disk.origin of each Disk object"""
     for disk, name in zip(disks, allocations):
-        disk.origin = '/data/{}/{}'.format(name, id_from(nodedn))
+        number = name.replace('disk', '')
+        disk.origin = '/data/{}/{}'.format(number, id_from(nodedn))
 
 
 def remove_disks(offered, used):
@@ -188,3 +189,10 @@ def resources_from_offer(offer):
 def resources_from_job(job):
     """Returns the requested resources in the job"""
     return Resources(cpus=job.cpus, mem=job.mem, disks=job.disks, host=job.host)
+
+
+def initialize_cluster_status(cluster):
+    """Initialize cluster status"""
+    cluster.status = 'queued'
+    cluster.progress = 0
+    cluster.step = 0

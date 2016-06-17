@@ -6,6 +6,7 @@ from threading import Thread
 from mesos.interface import mesos_pb2
 from mesos.native import MesosSchedulerDriver
 from scheduler import BigDataScheduler
+import registry
 
 logger = logging.getLogger(__name__)
 
@@ -20,20 +21,16 @@ def submit(cluster):
 
 
 def kill(cluster):
-    taskid = mesos_pb2.TaskID()
-    taskid.value = str(cluster).replace("/", "_").replace(".", "-")
-    driver.killTask(taskid)
-
-    # service = registry.Cluster(instance_id)
-    # nodesList = service.nodes
-    # for node in nodesList:
-    #     clusterid = node.clusterid + "_" + node.name
-    #     message = TaskID()
-    #     message.value = clusterid
-    #     self.driver.killTask(message)
+    """Kill all the tasks of a given cluster"""
+    for node in cluster.nodes:
+        taskid = mesos_pb2.TaskID()
+        taskid.value = registry.id_from(str(node))
+        logger.info('Killing taskid {}'.format(taskid.value))
+        driver.killTask(taskid)
 
 
 def pending():
+    """Return the list of pending tasks"""
     return scheduler.pending()
 
 
@@ -47,10 +44,11 @@ def start(master):
     executor = mesos_pb2.ExecutorInfo()
     executor.executor_id.value = 'BigDataExecutor'
     executor.name = executor.executor_id.value
-    executor.command.value = '/usr/local/mesos/bin/paas-executor.py'
+    executor.command.value = '/usr/local/mesos/bin/bigdata-executor.py'
 
     framework = mesos_pb2.FrameworkInfo()
-    framework.user = ''  # the current user
+    # Leave empty to have Mesos fill in the current user
+    framework.user = 'root'
     framework.name = 'PaaS'
     framework.checkpoint = True
 

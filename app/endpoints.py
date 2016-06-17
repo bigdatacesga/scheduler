@@ -14,7 +14,9 @@ def submit_cluster():
         app.logger.info('POST /clusters: {}'.format(clusterdn))
         cluster = registry.Cluster(clusterdn)
         framework.submit(cluster)
-        return jsonify({'message': 'Service instance queued'}), 200
+        clusterid = registry.id_from(str(cluster))
+        return jsonify({'message': 'Service instance queued',
+                        'url': '/clusters/{}'.format(clusterid)}), 200
     else:
         app.logger.warn('POST /clusters: Invalid request')
         return jsonify({'status': '400',
@@ -22,9 +24,11 @@ def submit_cluster():
                         'message': 'Unable to get the clusterdn'}), 400
 
 
-@api.route('/clusters/<clusterdn>', methods=['DELETE'])
-def kill_cluster(clusterdn):
+@api.route('/clusters/<clusterid>', methods=['DELETE'])
+def kill_cluster(clusterid):
     """Kill a cluster instance"""
+    clusterdn = registry.dn_from(clusterid)
+    app.logger.info('Kill cluster with DN: {}'.format(clusterdn))
     cluster = registry.Cluster(clusterdn)
     framework.kill(cluster)
     return '', 204

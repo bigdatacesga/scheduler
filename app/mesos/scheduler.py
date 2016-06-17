@@ -235,6 +235,7 @@ class BigDataScheduler(Scheduler):
 
     def enqueue(self, cluster):
         """Enqueue all nodes of a given cluster"""
+        utils.initialize_cluster_status(cluster)
         self.queue.append(cluster.nodes)
 
     def pending(self):
