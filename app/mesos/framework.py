@@ -7,6 +7,8 @@ from mesos.interface import mesos_pb2
 from mesos.native import MesosSchedulerDriver
 from scheduler import BigDataScheduler
 
+logger = logging.getLogger(__name__)
+
 driver = None
 scheduler = None
 STARTED = False
@@ -42,9 +44,6 @@ def start(master):
     if driver and scheduler:
         return driver, scheduler
 
-    logging.basicConfig(level=logging.INFO,
-                        format='[%(asctime)s %(levelname)s] %(message)s')
-
     executor = mesos_pb2.ExecutorInfo()
     executor.executor_id.value = 'BigDataExecutor'
     executor.name = executor.executor_id.value
@@ -60,7 +59,7 @@ def start(master):
     implicitAcknowledgements = 1
 
     if os.getenv('MESOS_AUTHENTICATE'):
-        logging.info('Enabling framework authentication')
+        logger.info('Enabling framework authentication')
 
         credential = mesos_pb2.Credential()
         credential.principal = os.getenv('MESOS_PRINCIPAL')
@@ -84,7 +83,7 @@ def start(master):
     #driver_thread.setDaemon(True)
     driver_thread.start()
 
-    logging.info('Scheduler running')
+    logger.info('Scheduler running')
 
     return driver, scheduler
 
@@ -92,7 +91,7 @@ def start(master):
 def stop():
     """Stop the framework"""
     global driver, scheduler
-    logging.info('Shutting down scheduler')
+    logger.info('Shutting down scheduler')
     driver.stop()
     driver = None
     scheduler = None

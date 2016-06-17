@@ -30,6 +30,7 @@ import registry
 from . import utils
 from ..exceptions import ResourceException
 
+logger = logging.getLogger(__name__)
 
 ENDPOINT = 'http://consul:8500/v1/kv'
 DISKS_ENDPOINT = 'http://disks.service.int.cesga.es:5000/resources/disks/v1'
@@ -82,30 +83,35 @@ class BigDataScheduler(Scheduler):
           tasks will fail with a TASK_LOST status and a message saying as much).
         """
         for offer in offers:
-            logging.debug('Received offer with ID: {}'.format(offer.id.value))
+            logger.debug('Received offer with ID: {}'.format(offer.id.value))
             available = utils.resources_from_offer(offer)
-            logging.debug('Resources offered: node={}, cpus={}, mem={}, disks={}'
-                          .format(offer.hostname, available.cpus, available.mem,
-                                  available.disks))
+            logger.debug('Resources offered: node={}, cpus={}, mem={}, disks={}'
+                         .format(offer.hostname, available.cpus, available.mem,
+                                 available.disks))
             # Mesos tasks to launch generated from the job queue
             tasks = []
             for job in self.queue.pending():
                 required = utils.resources_from_job(job)
                 if utils.offer_has_enough_resources(available, required):
+                    logger.info('OfferID {} resources: node={}, cpus={}, mem={}, disks={}'
+                                .format(offer.id.value, offer.hostname,
+                                        available.cpus, available.mem, available.disks))
+                    logger.info('Job {} fits into offer'.format(job.name))
                     allocated_disks = utils.select_disks(available.disks, required.disks)
                     # TODO: Refactor disks allocation to a method
                     try:
                         utils.update_disks_service_allocate(
                             offer.hostname, allocated_disks, str(job.node))
                     except(ResourceException):
-                        logging.error("Task %s encountered resource error with Offer %s "
-                                      "in node %s", job.name, offer.id, offer.hostname)
-                        logging.error("Please check that a node with \"%s\" name exists "
-                                      "in the resource tree of the kvstore", offer.hostname)
+                        logger.error("Task %s encountered resource error with Offer %s "
+                                     "in node %s", job.name, offer.id, offer.hostname)
+                        logger.error("Please check that a node with \"%s\" name exists "
+                                     "in the resource tree of the kvstore", offer.hostname)
                         driver.declineOffer(offer.id)
                         #FIXME Offer can't be declined if it was previously used
                         break
                     job.disks = allocated_disks
+                    logger.info('Disks allocated for this job: {}'.format(job.disks))
                     job.slave_id = offer.slave_id.value
                     job.hostname = offer.hostname
                     job.offer_id = offer.id
@@ -121,13 +127,18 @@ class BigDataScheduler(Scheduler):
                     available.cpus -= job.cpus
                     available.mem -= job.mem
                     available.disks = utils.remove_disks(available.disks, allocated_disks)
+                    logger.info('Remaining offer resources: cpus={}, mem={}, disks={}'
+                                .format(available.cpus, available.mem, available.disks))
 
                     utils.update_cluster_progress(node)
 
-                    logging.info("Scheduling new task for launch: {}".format(job.name))
+                    logger.info("Scheduling new task for launch: {}".format(job.name))
                     tasks.append(self.task_from(job))
                     self.queue.remove(job)
             if tasks:
+                logger.info('Launching all tasks that fit inside this offer: {}'
+                            .format([t.name for t in tasks]))
+                logger.debug('Task details: \n{}'.format(tasks))
                 driver.launchTasks(offer.id, tasks)
             else:
                 driver.declineOffer(offer.id)
@@ -157,7 +168,7 @@ class BigDataScheduler(Scheduler):
           acknowledgements are in use, the scheduler must acknowledge this
           status on the driver.
         """
-        logging.info("Task {} is in state {}".format(
+        logger.info("Task {} is in state {}".format(
             update.task_id.value, mesos_pb2.TaskState.Name(update.state)))
 
     def frameworkMessage(self, driver, executor_id, slave_id, message):
@@ -189,18 +200,16 @@ class BigDataScheduler(Scheduler):
           scheduler driver.  The driver will be aborted BEFORE invoking this
           callback.
         """
-        logging.error(message)
+        logger.error(message)
 
     def task_from(self, job):
         """Create a mesos task from a given job"""
         task = mesos_pb2.TaskInfo()
         #task_id = str(uuid.uuid4())
-        #task_id = str(self.tasks.pop().replace("/", "_").replace(".", "-"))
-        task_id = str(job.clusterid + '_' + job.name)
-        task.task_id.value = task_id
+        task.task_id.value = job.name
         task.slave_id.value = job.slave_id
         task.name = job.name
-        task.data = json.dumps({"instance_dn": job.clusterid})
+        task.data = json.dumps({"node_dn": str(job.node)})
         task.executor.MergeFrom(self.executor)
 
         cpus = task.resources.add()

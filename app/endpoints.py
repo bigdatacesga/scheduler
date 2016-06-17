@@ -1,5 +1,5 @@
 from flask import jsonify, request
-from . import api
+from . import app, api
 from mesos import framework
 import registry
 
@@ -11,10 +11,12 @@ def submit_cluster():
     if is_valid(request):
         data = request.get_json()
         clusterdn = data['clusterdn']
+        app.logger.info('POST /clusters: {}'.format(clusterdn))
         cluster = registry.Cluster(clusterdn)
         framework.submit(cluster)
         return jsonify({'message': 'Service instance queued'}), 200
     else:
+        app.logger.warn('POST /clusters: Invalid request')
         return jsonify({'status': '400',
                         'error': 'Invalid request',
                         'message': 'Unable to get the clusterdn'}), 400

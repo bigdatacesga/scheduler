@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import logging
+import copy
 
 import requests
 import registry
@@ -51,7 +52,7 @@ class Job(object):
     """
     def __init__(self, node):
         self.node = node
-        self.name = node.clusterid + '_' + node.name
+        self.name = registry.id_from(str(node))
         self.cpus = int(node.cpu)
         self.mem = int(node.mem)
         if node.custom_disks == 'True':
@@ -61,6 +62,8 @@ class Job(object):
 
         if node.custom_node == 'True':
             self.host = node.mesos_node_hostname
+        else:
+            self.host = None
 
 
 class JobQueue(object):
@@ -71,7 +74,7 @@ class JobQueue(object):
 
     def pending(self):
         """Returns the list of pending jobs"""
-        return self._queue
+        return copy.copy(self._queue)
 
     def append(self, nodes):
         """Adds the given node list to the to the queue"""
