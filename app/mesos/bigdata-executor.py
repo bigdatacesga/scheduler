@@ -72,7 +72,8 @@ class BigDataExecutor(Executor):
             update.state = mesos_pb2.TASK_FINISHED
             driver.sendStatusUpdate(update)
             logging.info('Task finished, sent final status update.')
-            self.running_dockers.remove(node_dn)
+            if node_dn in self.running_dockers:
+                self.running_dockers.remove(node_dn)
 
         thread = Thread(target=run_task, args=())
         thread.start()
@@ -85,11 +86,12 @@ class BigDataExecutor(Executor):
           TaskStatus (i.e., with TASK_KILLED) and invoking ExecutorDriver's
           sendStatusUpdate.
         """
-        logging.info('Killing task {}'.format(task_id))
-        node_dn = registry.dn_from(task_id)
+        logging.warn('Killing task {}'.format(task_id.value))
+        node_dn = registry.dn_from(task_id.value)
         logging.info('docker-executor destroy {}'.format(node_dn))
         subprocess.call(['docker-executor', 'destroy', node_dn])
-        self.running_dockers.remove(node_dn)
+        if node_dn in self.running_dockers:
+            self.running_dockers.remove(node_dn)
 
     def frameworkMessage(self, driver, message):
         """
@@ -107,8 +109,13 @@ class BigDataExecutor(Executor):
           status updates for (e.g., TASK_KILLED, TASK_FINISHED, TASK_FAILED,
           etc) a TASK_LOST status update will be created.
         """
+        logging.info('Shutting down executor')
+        logging.debug('List of running containers to stop: {}'.format(self.running_dockers))
         for node_dn in self.running_dockers:
-            subprocess.call(['docker-executor', 'destroy', node_dn])
+            logging.info('docker-executor destroy {}'.format(node_dn))
+            # We must run in the background because in other case the script is killed
+            # before launching all the destroy processes
+            subprocess.Popen(['docker-executor', 'destroy', node_dn])
 
     def error(self, error, message):
         """
@@ -125,4 +132,7 @@ def main():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        format='%(asctime)s [%(funcName)s] %(levelname)s: %(message)s ',
+        level=logging.DEBUG)
     main()
