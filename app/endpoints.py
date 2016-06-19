@@ -19,9 +19,7 @@ def submit_cluster():
                         'url': '/clusters/{}'.format(clusterid)}), 200
     else:
         app.logger.warn('POST /clusters: Invalid request')
-        return jsonify({'status': '400',
-                        'error': 'Invalid request',
-                        'message': 'Unable to get the clusterdn'}), 400
+        return jsonify({'error': 'Invalid json or missing clusterdn'}), 400
 
 
 @api.route('/clusters/<clusterid>', methods=['DELETE'])
@@ -36,7 +34,7 @@ def kill_cluster(clusterid):
 
 @api.route('/clusters', methods=['GET'])
 def list_clusters():
-    """Get a list of cluster instances"""
+    """Get a list of queued tasks"""
     return jsonify({"queued_tasks": framework.pending()})
 
 

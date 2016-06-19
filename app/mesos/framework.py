@@ -12,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 driver = None
 scheduler = None
-STARTED = False
 
 
 def submit(cluster):
@@ -35,7 +34,7 @@ def pending():
 
 
 def start(master):
-    """Start the Big Data framework"""
+    """Start the mesos framework"""
     global driver, scheduler
 
     if driver and scheduler:
