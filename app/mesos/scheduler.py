@@ -122,6 +122,8 @@ class BigDataScheduler(Scheduler):
                     node.mesos_node_hostname = offer.hostname
                     node.mesos_offer_id = offer.id
                     utils.update_disks_origin(node.disks, allocated_disks, str(node))
+                    # FIXME wasn't this supposed to be done in the docker-executor
+                    utils.update_disks_destination(node.disks, allocated_disks, str(node))
 
                     # Reduce the remaining available resourses from this offer
                     available.cpus -= job.cpus
