@@ -55,13 +55,14 @@ class Job(object):
         self.name = registry.id_from(str(node))
         self.cpus = int(node.cpu)
         self.mem = int(node.mem)
-        if node.required_disks == 'True':
+        if node.get("use_custom_disks") is not None:
+            # Replace .name with the name extracted using a function and the Disk dn
             self.disks = [disk.name for disk in node.disks]
         else:
             self.disks = len(node.disks)
 
-        if node.required_node == 'True':
-            self.host = node.mesos_node_hostname
+        if node.get("required_node") is not None:
+            self.host = node.get("required_node")
         else:
             self.host = None
 
@@ -147,12 +148,6 @@ def set_disk_as_used(host, nodedn, disk):
     if r.status_code != 204:
         raise DiskServiceError('Error setting disk as used in the disks service')
 
-
-def update_disks_destination(disks, allocations, nodedn):
-    """Update the disk.destination of each Disk object"""
-    for disk, name in zip(disks, allocations):
-        number = name.replace('disk', '')
-        disk.destination = '/data/{}/{}'.format(number, id_from(nodedn))
 
 def update_disks_origin(disks, allocations, nodedn):
     """Update the disk.origin of each Disk object"""

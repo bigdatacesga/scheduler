@@ -1,4 +1,4 @@
 Flask==0.10.1
 kvstore==0.1.1
-configuration-registry==0.1.24
+configuration-registry==0.2.2
 requests==2.10.0
