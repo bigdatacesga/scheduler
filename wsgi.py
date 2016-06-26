@@ -37,7 +37,7 @@ mesos.framework.start(master)
 
 if __name__ == '__main__':
     #import pdb; pdb.set_trace()
-    application.run(threaded=False, port=5004)
+    application.run(threaded=False, port=5000)
     # When the flask application ends we need to stop also the scheduler thread
     # TODO: Check how to do the same with gunicorn (it does not call __main__)
     mesos.framework.stop()
