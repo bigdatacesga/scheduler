@@ -1,2 +1,0 @@
-0.1.0
-+ Basic functionalities, get info from kvstore using complete path to instance and launch nodes
