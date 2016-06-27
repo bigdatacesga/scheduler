@@ -18,16 +18,16 @@ class StatusTestCase(unittest.TestCase):
     def setUp(self):
         registry.connect(ENDPOINT)
         # FIXME: Instantiating/deinstantiating each time is too slow
-        #self.cluster = registry.instantiate('test', 'example', '0.1.0', {'size': 2})
-        self.cluster = registry.Cluster('instances/test/example/0.1.0/1')
-        self.node = registry.Node('instances/test/example/0.1.0/1/nodes/example1')
+        self.cluster = registry.instantiate('test', 'example', '0.1.0', {'size': 2})
+        self.node = self.cluster.nodes[0]
+        #self.cluster = registry.Cluster('instances/test/example/0.1.0/1')
+        #self.node = registry.Node('instances/test/example/0.1.0/1/nodes/example1')
 
     def tearDown(self):
         # FIXME: Instantiating/deinstatiating each time is too slow
-        #dn = str(cluster)
-        #id = dn[dn.rfind('/')+1:]
-        #registry.deinstantiate('test', 'example', '0.1.0', {'size': 2}, id)
-        pass
+        dn = self.cluster.dn
+        id = dn[dn.rfind('/')+1:]
+        registry.deinstantiate('test', 'example', '0.1.0', id)
 
     def test_update_cluster_step(self):
         node = self.node

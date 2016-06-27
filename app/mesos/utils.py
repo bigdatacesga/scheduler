@@ -52,18 +52,17 @@ class Job(object):
     """
     def __init__(self, node):
         self.node = node
-        self.name = registry.id_from(str(node))
+        self.name = registry.id_from(node.dn)
         self.cpus = int(node.cpu)
         self.mem = int(node.mem)
 
-        if isinstance(node.disks, str) or isinstance(node.disks, int):
-            self.disks = int(node.disks)
-
-        if isinstance(node.disks, list) or isinstance(node.disks, tuple):
+        if node.get('use_custom_disks'):
             self.disks = [disk.name for disk in node.disks]
+        else:
+            self.disks = len(node.disks)
 
-        if node.get("host") is not None:
-            self.host = node.get("required_node")
+        if node.get('host') is not None:
+            self.host = node.get('required_node')
         else:
             self.host = None
 
@@ -111,7 +110,7 @@ def has_enough_disks(offered, required):
         for disk in required:
             if disk not in offered:
                 return False
-    elif isinstance(required, int) and len(offered) < required:
+    elif len(offered) < required:
         return False
     return True
 

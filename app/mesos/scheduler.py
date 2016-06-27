@@ -119,18 +119,11 @@ class BigDataScheduler(Scheduler):
                     # Update node object information
                     node = job.node
 
-                    if isinstance(node.disks, str) or isinstance(node.disks, int):
-                        disk_list = list()
-                        for disk in allocated_disks:
-                            disk_list.append({"name": disk, "destination": "/tmp/{}".format(disk)})
-                        # FIXME what do we do when node.disks is a number, a Disk structure has to be created before we continue from here
-                        node.set_disks(disk_list)
-
                     #node.mesos_slave_id = offer.slave_id.value
                     #node.mesos_node_hostname = offer.hostname
                     #node.mesos_offer_id = offer.id
                     utils.update_disks_origin(node.disks, allocated_disks, str(node))
-                    
+
                     # Reduce the remaining available resourses from this offer
                     available.cpus -= job.cpus
                     available.mem -= job.mem
