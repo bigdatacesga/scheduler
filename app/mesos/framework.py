@@ -26,6 +26,7 @@ def kill(cluster):
         taskid.value = registry.id_from(str(node))
         logger.info('Killing taskid {}'.format(taskid.value))
         driver.killTask(taskid)
+    cluster.status = 'destroyed'
 
 
 def pending():

@@ -26,9 +26,7 @@ def update_cluster_progress(node):
     cluster.step = step
     cluster.progress = int(float(step) / total * 100)
     if step == total:
-        cluster.status = 'executing'
-    else:
-        cluster.status = 'launching'
+        cluster.status = 'scheduled'
 
 
 class Resources(object):
@@ -194,6 +192,6 @@ def resources_from_job(job):
 
 def initialize_cluster_status(cluster):
     """Initialize cluster status"""
-    cluster.status = 'queued'
+    cluster.status = 'scheduling'
     cluster.progress = 0
     cluster.step = 0
