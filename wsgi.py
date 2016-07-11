@@ -28,7 +28,7 @@ master = application.config.get('MESOS_MASTER')
 mesos.framework.start(master)
 
 if __name__ == '__main__':
-    application.run(threaded=False, port=5000)
+    application.run(threaded=False, port=6001)
     # When the flask application ends we need to stop also the scheduler thread
     # TODO: Check how to do the same with gunicorn (it does not call __main__)
     mesos.framework.stop()
