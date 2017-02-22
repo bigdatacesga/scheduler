@@ -30,4 +30,4 @@ Mesos executor
 --------------
 The mesos executor must be distrubuted to the mesos slaves at placed at:
 
-    /usr/local/mesos/bin/paas-executor.py
+    /usr/local/mesos/bin/bigdata-executor.py
